@@ -49,20 +49,20 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
 
         // Update the results map with the new information
         results.addAll(newInformation);
-
+        debugPrint('$newInformation');
         // If the 'Pitch' value is found, add a new DataPoint
         if (newInformation.containsKey('Pitch') &&
             newInformation['Pitch'] != 'Waiting...' &&
-            newInformation['Pitch'] != lastPitchValue &&
             newInformation.containsKey('Roll') &&
             newInformation['Roll'] != 'Waiting...' &&
-            newInformation['Roll'] != lastRollValue) {
+            (newInformation['Roll'] != lastRollValue ||
+                newInformation['Pitch'] != lastPitchValue)) {
           double timestamp = DateTime.now().millisecondsSinceEpoch / 1000;
           dataPoints.add(DataPoint(
               timestamp,
               double.parse(newInformation['Pitch']!),
               double.parse(newInformation['Roll']!)));
-          debugPrint('${dataPoints.length}');
+
           lastPitchValue = newInformation['Pitch']!;
           lastRollValue = newInformation['Roll']!;
           if (dataPoints.length > 1000) {
