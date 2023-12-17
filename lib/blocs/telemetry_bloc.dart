@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
@@ -9,10 +10,10 @@ import 'telemetry_state.dart';
 
 class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
   Map<Uint8List, String> indices = {
-    Uint8List.fromList([62, 20, 0, 0]): 'MW1 speed',
-    Uint8List.fromList([205, 20, 0, 0]): 'MW2 speed',
     Uint8List.fromList([80, 20, 0, 0]): 'Pitch',
     Uint8List.fromList([77, 20, 0, 0]): 'Roll',
+    Uint8List.fromList([62, 20, 0, 0]): 'MW1 speed',
+    Uint8List.fromList([205, 20, 0, 0]): 'MW2 speed',
   };
 
   static Uint8List hexToBytes(String hex) {
@@ -37,26 +38,31 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
     // Add other variables as needed
   };
 
+  final int bufferSize = 1000; // Define the buffer size
+  final Queue<FrameEvent> buffer = Queue<FrameEvent>(); // Stores FrameEvents
   List<DataPoint> dataPoints = [];
-  int counter = 0;
   String lastPitchValue = 'Waiting...';
   String lastRollValue = 'Waiting...';
+
   TelemetryBloc() : super(InformationState({}, [], {}, {})) {
     on<FrameEvent>((event, emit) async {
+      buffer.add(event);
+      if (buffer.length > bufferSize) {
+        buffer.removeFirst();
+      }
+      var bufferedEvent = buffer.last;
       // Process the frame data
       try {
-        Map<String, String> newInformation = processFrame(event.frameData);
+        Map<String, String> newInformation =
+            processFrame(bufferedEvent.frameData);
 
         // Update the results map with the new information
-        results.addAll(newInformation);
-        debugPrint('$newInformation');
+
         // If the 'Pitch' value is found, add a new DataPoint
         if (newInformation.containsKey('Pitch') &&
             newInformation['Pitch'] != 'Waiting...' &&
             newInformation.containsKey('Roll') &&
-            newInformation['Roll'] != 'Waiting...' &&
-            (newInformation['Roll'] != lastRollValue ||
-                newInformation['Pitch'] != lastPitchValue)) {
+            newInformation['Roll'] != 'Waiting...') {
           double timestamp = DateTime.now().millisecondsSinceEpoch / 1000;
           dataPoints.add(DataPoint(
               timestamp,
@@ -65,11 +71,11 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
 
           lastPitchValue = newInformation['Pitch']!;
           lastRollValue = newInformation['Roll']!;
-          if (dataPoints.length > 1000) {
+          if (dataPoints.length > 20000) {
             dataPoints.removeAt(0);
           }
         }
-
+        //results.addAll(newInformation);
         emit(InformationState(results, dataPoints, minValues, maxValues));
       } catch (e) {
         debugPrint('Error in on<FrameEvent>: $e');
@@ -94,6 +100,7 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
   Map<String, String> processFrame(String frameData) {
     // Convert the frame data to bytes
     Uint8List hexData = hexToBytes(frameData.replaceAll(' ', ''));
+
     // Initialize the results map
 
     // Process the hex data
@@ -108,24 +115,26 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
 
     int i = 0;
     while (i < hexData.length - 4) {
-      for (Uint8List byteIndex in byteIndices.keys) {
+      for (Uint8List byteIndex in indices.keys) {
         if (listEquals(hexData.sublist(i, i + 4), byteIndex)) {
           Uint8List valueBytes = hexData.sublist(i + 4, i + 12);
-
           Uint8List dataType = byteIndex.sublist(2, 4);
           if (listEquals(dataType, [2, 0])) {
             // Convert bytes to decimal
             int decimalValue =
                 valueBytes.buffer.asByteData().getUint64(0, Endian.little);
-            decimalResults[byteIndices[byteIndex]!] = decimalValue.toString();
+            if (decimalValue < 50000 && decimalValue > -50000) {
+              decimalResults[byteIndices[byteIndex]!] = decimalValue.toString();
+            }
           } else if (listEquals(dataType, [0, 0])) {
             // Convert bytes to double
             double doubleValue =
                 valueBytes.buffer.asByteData().getFloat64(0, Endian.little);
-            doubleResults[byteIndices[byteIndex]!] =
-                doubleValue.toStringAsFixed(3);
+            if (doubleValue < 50000.0 && doubleValue > -50000.0) {
+              doubleResults[byteIndices[byteIndex]!] =
+                  doubleValue.toStringAsFixed(3);
+            }
           }
-
           i += 11; // Skip to the next index
           break;
         }
@@ -148,7 +157,6 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
             max(maxValues[name] ?? double.negativeInfinity, value);
       }
     }
-
     return results;
   }
 
@@ -163,17 +171,30 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
       if (isMulticat) {
         datagramSocket.joinMulticast(multicastAddress);
       }
-
       datagramSocket.listen((RawSocketEvent event) {
         if (event == RawSocketEvent.read) {
           final datagram = datagramSocket.receive();
           if (datagram == null) return;
 
           // Convert the data to a hexadecimal string
-          String hexData = datagram.data
-              .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-              .join(' ');
-          add(FrameEvent(hexData)); // Add a new FrameEvent to the BLoC
+
+          Uint8List bid = datagram.data.sublist(10, 14);
+          if (datagram.port == 49448) {
+            if (listEquals(bid, [16, 04, 240, 96])) {
+              if (datagram.data[24] == 4 ||
+                  datagram.data[24] == 5 ||
+                  datagram.data[24] == 6 ||
+                  datagram.data[24] == 7 ||
+                  datagram.data[24] == 8 ||
+                  datagram.data[24] == 18) {
+                String hexData = datagram.data
+                    .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+                    .join(' ');
+                add(FrameEvent(hexData));
+              }
+            }
+          }
+          // Add a new FrameEvent to the BLoC
         }
       });
     } catch (e) {
