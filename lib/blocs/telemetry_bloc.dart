@@ -127,6 +127,7 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
               decimalResults[byteIndices[byteIndex]!] = decimalValue.toString();
             }
           } else if (listEquals(dataType, [0, 0])) {
+            debugPrint('${(546.6435433 * 1000).floor() / 1000}');
             // Convert bytes to double
             double doubleValue =
                 valueBytes.buffer.asByteData().getFloat64(0, Endian.little);
@@ -179,21 +180,22 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
           // Convert the data to a hexadecimal string
 
           Uint8List bid = datagram.data.sublist(10, 14);
-          if (datagram.port == 49448) {
-            if (listEquals(bid, [16, 04, 240, 96])) {
-              if (datagram.data[24] == 4 ||
-                  datagram.data[24] == 5 ||
-                  datagram.data[24] == 6 ||
-                  datagram.data[24] == 7 ||
-                  datagram.data[24] == 8 ||
-                  datagram.data[24] == 18) {
-                String hexData = datagram.data
-                    .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-                    .join(' ');
-                add(FrameEvent(hexData));
-              }
+          //if (datagram.port == 49448) {
+          if (listEquals(bid, [16, 04, 240, 96])) {
+            debugPrint(datagram.data[24].toString());
+            if (datagram.data[24] == 4 ||
+                datagram.data[24] == 5 ||
+                datagram.data[24] == 6 ||
+                datagram.data[24] == 7 ||
+                datagram.data[24] == 8 ||
+                datagram.data[24] == 18) {
+              String hexData = datagram.data
+                  .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+                  .join(' ');
+              add(FrameEvent(hexData));
             }
           }
+          //}
           // Add a new FrameEvent to the BLoC
         }
       });
