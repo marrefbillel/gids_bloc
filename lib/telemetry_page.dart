@@ -12,7 +12,6 @@ class TelemetryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Size size = MediaQuery.of(context).size;
-    debugPrint(size.width.toString());
     final TrackballBehavior trackballBehavior = TrackballBehavior(
         enable: true,
         activationMode: ActivationMode.singleTap,

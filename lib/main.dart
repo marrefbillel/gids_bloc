@@ -2,9 +2,8 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:gids_bloc/blocs/mw1_mw2/mw1_mw2_bloc.dart';
 import 'package:gids_bloc/blocs/pitch_roll/pitch_roll_bloc.dart';
-import 'package:gids_bloc/blocs/telemetry_bloc.dart';
+import 'package:gids_bloc/blocs/system_mode/system_mode_bloc.dart';
 import 'package:gids_bloc/screens/telemetry_display.dart';
-import 'package:gids_bloc/telemetry_page.dart';
 import 'package:gids_bloc/windows_buttons.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -18,8 +17,8 @@ void main() async {
       TitleBarStyle.hidden,
       windowButtonVisibility: false,
     );
-    await windowManager.setSize(const Size(1800, 1200));
-    await windowManager.setMinimumSize(const Size(600, 400));
+    await windowManager.setSize(const Size(1600, 1100));
+    await windowManager.setMinimumSize(const Size(800, 600));
     await windowManager.center();
     await windowManager.show();
     await windowManager.setSkipTaskbar(false);
@@ -46,6 +45,7 @@ class MyApp extends StatelessWidget {
         providers: [
           BlocProvider(create: (context) => PitchRollBloc()),
           BlocProvider(create: (context) => Mw1Mw2Bloc()),
+          BlocProvider(create: (context) => SystemModeBloc()),
         ],
         child: const MyHomePage(),
       ),
