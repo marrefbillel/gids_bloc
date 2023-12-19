@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,8 @@ import 'package:gids_bloc/blocs/system_mode/system_mode_state.dart';
 import 'package:gids_bloc/datapoint.dart';
 import 'package:gids_bloc/widgets/datagram_listener.dart';
 import 'package:gids_bloc/widgets/digital_clock.dart';
+import 'package:gids_bloc/widgets/udp_listener.dart';
+import 'package:gids_bloc/widgets/working_mode_stream.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
@@ -22,6 +25,8 @@ class TelemetryDisplay extends StatefulWidget {
 }
 
 class _TelemetryDisplayState extends State<TelemetryDisplay> {
+  final StreamController<int> bcDataStreamController = StreamController<int>();
+  final StreamController<int> bgDataStreamController = StreamController<int>();
   late final PitchRollBloc pitchRollBloc;
   late final Mw1Mw2Bloc mw1Mw2Bloc;
   late final SystemModeBloc systemModeBloc;
@@ -41,6 +46,20 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
       mw1Mw2Bloc: mw1Mw2Bloc,
       systemModeBloc: systemModeBloc,
     );
+    udpListener(
+      16010,
+      bcDataStreamController,
+      InternetAddress("0.0.0.0"),
+    );
+    udpListener(
+      16110,
+      bgDataStreamController,
+      InternetAddress("0.0.0.0"),
+    ); // Start listening for UDP data on port 16010
+    // udpListener(
+    //   16110,
+    //   InternetAddress("0.0.0.0"),
+    // );
   }
 
   @override
@@ -48,6 +67,8 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
     pitchRollBloc.close();
     mw1Mw2Bloc.close();
     systemModeBloc.close();
+    bcDataStreamController.close();
+    bgDataStreamController.close();
     super.dispose();
   }
 
@@ -55,10 +76,12 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
   Widget build(BuildContext context) {
     Size size = MediaQuery.of(context).size;
     final TrackballBehavior trackballBehavior = TrackballBehavior(
-        enable: true,
-        activationMode: ActivationMode.singleTap,
-        tooltipAlignment: ChartAlignment.near,
-        tooltipDisplayMode: TrackballDisplayMode.groupAllPoints);
+      enable: true,
+      activationMode: ActivationMode.singleTap,
+      tooltipAlignment: ChartAlignment.near,
+      tooltipDisplayMode: TrackballDisplayMode.groupAllPoints,
+    );
+
     final ZoomPanBehavior zoomPanBehavior = ZoomPanBehavior(
       enableMouseWheelZooming: true,
       enableSelectionZooming: true,
@@ -67,11 +90,17 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
       enablePinching: true,
       zoomMode: ZoomMode.xy,
     );
+    final CrosshairBehavior crosshairBehavior = CrosshairBehavior(
+      enable: true,
+      activationMode: ActivationMode.singleTap,
+      shouldAlwaysShow: true,
+    );
     final TrackballBehavior trackballBehavior2 = TrackballBehavior(
-        enable: true,
-        activationMode: ActivationMode.singleTap,
-        tooltipAlignment: ChartAlignment.near,
-        tooltipDisplayMode: TrackballDisplayMode.groupAllPoints);
+      enable: true,
+      activationMode: ActivationMode.singleTap,
+      tooltipAlignment: ChartAlignment.near,
+      tooltipDisplayMode: TrackballDisplayMode.groupAllPoints,
+    );
     final ZoomPanBehavior zoomPanBehavior2 = ZoomPanBehavior(
       enableMouseWheelZooming: true,
       enableSelectionZooming: true,
@@ -83,28 +112,48 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
     return Scaffold(
       body: Column(
         children: [
-          BlocBuilder<SystemModeBloc, SystemModeState>(
-              builder: (context, state) {
-            if (state is SystemModeReceived) {
-              return Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    const DigitalClock(),
-                    valueContainer(size, '${state.mode}',
-                        conversionMap: {'0': 'NM', '1': 'SKM'}),
-                    valueContainer(size, '${state.subMode}',
-                        conversionMap: {'0': 'NM', '1': 'SKM'}),
-                  ],
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                const DigitalClock(),
+                BlocBuilder<SystemModeBloc, SystemModeState>(
+                    builder: (context, state) {
+                  if (state is SystemModeReceived) {
+                    return Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        children: [
+                          const Text("System mode : "),
+                          const SizedBox(width: 10),
+                          valueContainer(size, '${state.mode}',
+                              conversionMap: {'0': 'NM', '1': 'SKM'}),
+                          const SizedBox(width: 10),
+                          // const Text("Subsystem mode : "),
+                          // const SizedBox(width: 10),
+                          // valueContainer(size, '${state.subMode}',
+                          //     conversionMap: {'0': 'NM', '1': 'SKM'}),
+                        ],
+                      ),
+                    );
+                  } else {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+                }),
+                WorkingModeStream(
+                  dataStreamController: bcDataStreamController,
+                  station: "BC",
                 ),
-              );
-            } else {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
-          }),
+                WorkingModeStream(
+                  dataStreamController: bgDataStreamController,
+                  station: "BG",
+                ),
+              ],
+            ),
+          ),
           Center(
             child: Text(
               "Pitch and Roll",
@@ -153,6 +202,7 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
                               ],
                               trackballBehavior: trackballBehavior,
                               zoomPanBehavior: zoomPanBehavior,
+                              crosshairBehavior: crosshairBehavior,
                             )
                           : const Center(
                               child: Text("No data to Plot"),
@@ -314,20 +364,20 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
                         ),
                       ),
                       valueContainer(size, '${state.mw1Speed}',
-                          lowerYellow: 4779,
-                          lowerRed: 4778,
-                          upperYellow: 4782,
-                          upperRed: 4783),
+                          lowerYellow: 4000,
+                          lowerRed: 3800,
+                          upperYellow: 5000,
+                          upperRed: 5200),
                       valueContainer(size, '${state.minMw1Speed}',
-                          lowerYellow: 4779,
-                          lowerRed: 4778,
-                          upperYellow: 4782,
-                          upperRed: 4783),
+                          lowerYellow: 4000,
+                          lowerRed: 3800,
+                          upperYellow: 5000,
+                          upperRed: 5200),
                       valueContainer(size, '${state.maxMw1Speed}',
-                          lowerYellow: 4779,
-                          lowerRed: 4778,
-                          upperYellow: 4782,
-                          upperRed: 4783),
+                          lowerYellow: 4000,
+                          lowerRed: 3800,
+                          upperYellow: 5000,
+                          upperRed: 5200),
                     ],
                   ),
                   const SizedBox(height: 5),
@@ -346,20 +396,20 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
                         ),
                       ),
                       valueContainer(size, '${state.mw2Speed}',
-                          lowerYellow: 4816,
-                          lowerRed: 4815,
-                          upperYellow: 4818,
-                          upperRed: 4819),
+                          lowerYellow: 4000,
+                          lowerRed: 3800,
+                          upperYellow: 5000,
+                          upperRed: 5200),
                       valueContainer(size, '${state.minMw2Speed}',
-                          lowerYellow: 4816,
-                          lowerRed: 4815,
-                          upperYellow: 4818,
-                          upperRed: 4819),
+                          lowerYellow: 4000,
+                          lowerRed: 3800,
+                          upperYellow: 5000,
+                          upperRed: 5200),
                       valueContainer(size, '${state.maxMw2Speed}',
-                          lowerYellow: 4816,
-                          lowerRed: 4815,
-                          upperYellow: 4818,
-                          upperRed: 4819),
+                          lowerYellow: 4000,
+                          lowerRed: 3800,
+                          upperYellow: 5000,
+                          upperRed: 5200),
                     ],
                   ),
                 ],

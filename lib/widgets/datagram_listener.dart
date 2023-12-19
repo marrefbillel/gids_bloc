@@ -30,9 +30,7 @@ Future<void> datagramListener(
         // Convert the data to a hexadecimal string
         Uint8List bid = datagram.data.sublist(10, 14);
         if (listEquals(bid, [01, 02, 224, 96])) {
-          debugPrint("Bid found");
           if (datagram.data[24] == 60) {
-            debugPrint("3C found");
             String hexString = datagram.data
                 .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
                 .join(' ');
@@ -52,6 +50,7 @@ Future<void> datagramListener(
           Uint8List hexData = hexToBytes(hexString.replaceAll(' ', ''));
           pitchRollBloc.add(PRFrameReceived(hexData));
           mw1Mw2Bloc.add(MWFrameReceived(hexData));
+          systemModeBloc.add(SMFrameReceived(hexData));
         }
         //}
       }

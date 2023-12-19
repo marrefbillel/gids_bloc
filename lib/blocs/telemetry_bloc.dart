@@ -127,7 +127,6 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
               decimalResults[byteIndices[byteIndex]!] = decimalValue.toString();
             }
           } else if (listEquals(dataType, [0, 0])) {
-            debugPrint('${(546.6435433 * 1000).floor() / 1000}');
             // Convert bytes to double
             double doubleValue =
                 valueBytes.buffer.asByteData().getFloat64(0, Endian.little);
@@ -182,7 +181,6 @@ class TelemetryBloc extends Bloc<FrameEvent, InformationState> {
           Uint8List bid = datagram.data.sublist(10, 14);
           //if (datagram.port == 49448) {
           if (listEquals(bid, [16, 04, 240, 96])) {
-            debugPrint(datagram.data[24].toString());
             if (datagram.data[24] == 4 ||
                 datagram.data[24] == 5 ||
                 datagram.data[24] == 6 ||
