@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:gids_bloc/blocs/mw1_mw2/mw1_mw2_bloc.dart';
 import 'package:gids_bloc/blocs/pitch_roll/pitch_roll_bloc.dart';
 import 'package:gids_bloc/blocs/system_mode/system_mode_bloc.dart';
+import 'package:gids_bloc/blocs/telecommand/telecommand_bloc.dart';
+import 'package:gids_bloc/julian_converter.dart';
+import 'package:gids_bloc/screens/north_south.dart';
 import 'package:gids_bloc/screens/telemetry_display.dart';
 import 'package:gids_bloc/windows_buttons.dart';
 import 'package:window_manager/window_manager.dart';
@@ -17,7 +20,7 @@ void main() async {
       TitleBarStyle.hidden,
       windowButtonVisibility: false,
     );
-    await windowManager.setSize(const Size(1600, 1100));
+    await windowManager.setSize(const Size(1600, 1020));
     await windowManager.setMinimumSize(const Size(800, 600));
     await windowManager.center();
     await windowManager.show();
@@ -96,9 +99,21 @@ class _MyHomePageState extends State<MyHomePage> {
               FluentIcons.home,
               size: 20,
             ),
-            title: const Text('North South Maneuver'),
+            title: const Text('East West Maneuver'),
             body: const TelemetryDisplay(),
           ),
+          PaneItem(
+            icon: const Icon(FluentIcons.mosty_cloudy_showers_day),
+            title: const Text('North South Maneuver'),
+            body: BlocProvider(
+              create: (context) => TelecommandBloc(),
+              child: const NorthSouth(),
+            ),
+          ),
+          PaneItem(
+              icon: const Icon(FluentIcons.machine_learning),
+              title: const Text('Julian Converter'),
+              body: const JulianConveter()),
         ],
         selected: _currentPage,
         onChanged: (index) => setState(() {

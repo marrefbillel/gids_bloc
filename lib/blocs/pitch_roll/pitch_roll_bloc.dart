@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:gids_bloc/blocs/pitch_roll/pitch_roll_event.dart';
 import 'package:gids_bloc/blocs/pitch_roll/pitch_roll_state.dart';
 import 'package:gids_bloc/datapoint.dart';
-import 'package:gids_bloc/widgets/extract_param.dart';
 
 class PitchRollBloc extends Bloc<PitchRollEvent, PitchRollState> {
   final eventQueue = Queue<PitchRollEvent>();
@@ -21,22 +20,12 @@ class PitchRollBloc extends Bloc<PitchRollEvent, PitchRollState> {
 
   PitchRollBloc() : super(PitchRollInitial()) {
     on<PRFrameReceived>((event, emit) async {
-      if (eventQueue.length >= maxQueueSize) {
-        eventQueue.removeFirst();
-      }
-      // eventQueue.add(event);
-      // for (var value in eventQueue) {
-      //   if (value is PRFrameReceived) {
-      //     debugPrint(value.frameData.toString());
-      //   }
-      // }
-      //final pitch = extractPitch(event.frameData);
-      final pitch = extractDoubleFromParam(
-          event.frameData, Uint8List.fromList([80, 20, 0, 0]));
-      final roll = extractDoubleFromParam(
-          event.frameData, Uint8List.fromList([77, 20, 0, 0]));
-      //final roll = extractRoll(event.frameData);
-      if (pitch != null && roll != null) {
+      try {
+        if (eventQueue.length >= maxQueueSize) {
+          eventQueue.removeFirst();
+        }
+        final roll = event.pitchAndRoll[0];
+        final pitch = event.pitchAndRoll[1];
         if (pitch < minPitch) {
           minPitch = pitch;
           minPitchDate = DateTime.now();
@@ -53,10 +42,6 @@ class PitchRollBloc extends Bloc<PitchRollEvent, PitchRollState> {
           maxRoll = roll;
           maxRollDate = DateTime.now();
         }
-        //minPitch = min(minPitch, pitch);
-        // maxPitch = max(maxPitch, pitch);
-        // minRoll = min(minRoll, roll);
-        // maxRoll = max(maxRoll, roll);
         dataPoints.add(DataPoint(
             DateTime.now().millisecondsSinceEpoch / 1000, pitch, roll));
         if (dataPoints.length > 20000) {
@@ -74,7 +59,23 @@ class PitchRollBloc extends Bloc<PitchRollEvent, PitchRollState> {
             maxPitchDate,
             minRollhDate,
             maxRollDate));
+      } catch (e) {
+        debugPrint('Error: $e');
       }
+    });
+    on<PRReset>((event, emit) async {
+      // Reset the state of your bloc here
+      // For example:
+      minPitch = double.infinity;
+      maxPitch = double.negativeInfinity;
+      minRoll = double.infinity;
+      maxRoll = double.negativeInfinity;
+      dataPoints = [];
+      minPitchDate = DateTime.now();
+      maxPitchDate = DateTime.now();
+      minRollhDate = DateTime.now();
+      maxRollDate = DateTime.now();
+      emit(PitchRollInitial());
     });
   }
 }

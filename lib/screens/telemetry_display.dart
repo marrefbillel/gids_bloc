@@ -4,10 +4,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:gids_bloc/blocs/mw1_mw2/mw1_mw2_bloc.dart';
+import 'package:gids_bloc/blocs/mw1_mw2/mw1_mw2_event.dart';
 import 'package:gids_bloc/blocs/mw1_mw2/mw1_mw2_state.dart';
 import 'package:gids_bloc/blocs/pitch_roll/pitch_roll_bloc.dart';
+import 'package:gids_bloc/blocs/pitch_roll/pitch_roll_event.dart';
 import 'package:gids_bloc/blocs/pitch_roll/pitch_roll_state.dart';
 import 'package:gids_bloc/blocs/system_mode/system_mode_bloc.dart';
+import 'package:gids_bloc/blocs/system_mode/system_mode_event.dart';
 import 'package:gids_bloc/blocs/system_mode/system_mode_state.dart';
 import 'package:gids_bloc/datapoint.dart';
 import 'package:gids_bloc/widgets/datagram_listener.dart';
@@ -25,50 +28,84 @@ class TelemetryDisplay extends StatefulWidget {
 }
 
 class _TelemetryDisplayState extends State<TelemetryDisplay> {
-  final StreamController<int> bcDataStreamController = StreamController<int>();
-  final StreamController<int> bgDataStreamController = StreamController<int>();
-  late final PitchRollBloc pitchRollBloc;
-  late final Mw1Mw2Bloc mw1Mw2Bloc;
-  late final SystemModeBloc systemModeBloc;
+  StreamController<int>? bcDataStreamController;
+  StreamController<int>? bgDataStreamController;
 
-  @override
-  void initState() {
-    super.initState();
-    pitchRollBloc = BlocProvider.of<PitchRollBloc>(context);
-    mw1Mw2Bloc = BlocProvider.of<Mw1Mw2Bloc>(context);
-    systemModeBloc = BlocProvider.of<SystemModeBloc>(context);
-    datagramListener(
+  PitchRollBloc? pitchRollBloc;
+  Mw1Mw2Bloc? mw1Mw2Bloc;
+  SystemModeBloc? systemModeBloc;
+
+  StreamSubscription<RawSocketEvent>? datagramSubscription;
+  StreamSubscription<RawSocketEvent>? udpSubscriptionBC;
+  StreamSubscription<RawSocketEvent>? udpSubscriptionBG;
+
+  void startDatagramListener() async {
+    datagramSubscription = await datagramListener(
       2246,
       InternetAddress("0.0.0.0"),
       true,
       multicastAddress: InternetAddress("239.0.0.5"),
-      pitchRollBloc: pitchRollBloc,
-      mw1Mw2Bloc: mw1Mw2Bloc,
-      systemModeBloc: systemModeBloc,
+      pitchRollBloc: pitchRollBloc!,
+      mw1Mw2Bloc: mw1Mw2Bloc!,
+      systemModeBloc: systemModeBloc!,
     );
-    udpListener(
+  }
+
+  void stopDatagramListener() {
+    debugPrint('Stopping datagram listener...');
+    datagramSubscription?.cancel();
+    datagramSubscription = null;
+  }
+
+  void startUdpListenerBC() async {
+    udpSubscriptionBC = await udpListener(
       16010,
-      bcDataStreamController,
+      bcDataStreamController!,
       InternetAddress("0.0.0.0"),
     );
-    udpListener(
+  }
+
+  void stopUdpListenerBC() {
+    udpSubscriptionBC?.cancel();
+    udpSubscriptionBC = null;
+  }
+
+  void startUdpListenerBG() async {
+    udpSubscriptionBG = await udpListener(
       16110,
-      bgDataStreamController,
+      bgDataStreamController!,
       InternetAddress("0.0.0.0"),
-    ); // Start listening for UDP data on port 16010
-    // udpListener(
-    //   16110,
-    //   InternetAddress("0.0.0.0"),
-    // );
+    );
+  }
+
+  void stopUdpListenerBG() {
+    udpSubscriptionBG?.cancel();
+    udpSubscriptionBG = null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    pitchRollBloc ??= BlocProvider.of<PitchRollBloc>(context);
+    mw1Mw2Bloc ??= BlocProvider.of<Mw1Mw2Bloc>(context);
+    systemModeBloc ??= BlocProvider.of<SystemModeBloc>(context);
+    bcDataStreamController ??= StreamController<int>.broadcast();
+    bgDataStreamController ??= StreamController<int>.broadcast();
+    startDatagramListener();
+    startUdpListenerBC();
+    startUdpListenerBG();
   }
 
   @override
   void dispose() {
-    pitchRollBloc.close();
-    mw1Mw2Bloc.close();
-    systemModeBloc.close();
-    bcDataStreamController.close();
-    bgDataStreamController.close();
+    stopDatagramListener();
+    stopUdpListenerBC();
+    stopUdpListenerBG();
+    pitchRollBloc!.add(PRReset());
+    mw1Mw2Bloc!.add(MWReset());
+    systemModeBloc!.add(SMReset());
+    bcDataStreamController!.close();
+    bgDataStreamController!.close();
     super.dispose();
   }
 
@@ -121,21 +158,37 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
                 BlocBuilder<SystemModeBloc, SystemModeState>(
                     builder: (context, state) {
                   if (state is SystemModeReceived) {
-                    return Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          const Text("System mode : "),
-                          const SizedBox(width: 10),
-                          valueContainer(size, '${state.mode}',
-                              conversionMap: {'0': 'NM', '1': 'SKM'}),
-                          const SizedBox(width: 10),
-                          // const Text("Subsystem mode : "),
-                          // const SizedBox(width: 10),
-                          // valueContainer(size, '${state.subMode}',
-                          //     conversionMap: {'0': 'NM', '1': 'SKM'}),
-                        ],
-                      ),
+                    return Row(
+                      children: [
+                        Text(
+                          "SM:",
+                          style: TextStyle(fontSize: size.height * 0.015),
+                        ),
+                        const SizedBox(width: 10),
+                        valueContainer(
+                          size,
+                          '${state.mode}${state.subMode}',
+                          conversionMap: {
+                            '00': 'NM000',
+                            '01': 'NM001',
+                            '02': 'NM010',
+                            '03': 'NM011',
+                            '10': 'TRM000',
+                            '11': 'TRM001',
+                            '12': 'TRM010',
+                            '13': 'TRM011',
+                            '20': 'SKM000',
+                            '21': 'SKM001',
+                            '22': 'SKM010',
+                            '23': 'SKM011',
+                          },
+                        ),
+                        const SizedBox(width: 10),
+                        // const Text("Subsystem mode : "),
+                        // const SizedBox(width: 10),
+                        // valueContainer(size, '${state.subMode}',
+                        //     conversionMap: {'0': 'NM', '1': 'SKM'}),
+                      ],
                     );
                   } else {
                     return const Center(
@@ -144,15 +197,19 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
                   }
                 }),
                 WorkingModeStream(
-                  dataStreamController: bcDataStreamController,
+                  dataStreamController: bcDataStreamController!,
                   station: "BC",
                 ),
                 WorkingModeStream(
-                  dataStreamController: bgDataStreamController,
+                  dataStreamController: bgDataStreamController!,
                   station: "BG",
                 ),
               ],
             ),
+          ),
+          const Divider(
+            color: Colors.white54,
+            thickness: 3,
           ),
           Center(
             child: Text(
@@ -209,7 +266,6 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
                             ),
                     ),
                   ),
-                  const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -363,21 +419,36 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
                           ),
                         ),
                       ),
-                      valueContainer(size, '${state.mw1Speed}',
+                      valueContainer(
+                        size,
+                        '${state.mw1Speed}',
+                        lowerYellow: 4000,
+                        lowerRed: 3800,
+                        upperYellow: 5000,
+                        upperRed: 5200,
+                      ),
+                      Tooltip(
+                        message: state.minMw1Date.toString(),
+                        child: valueContainer(
+                          size,
+                          '${state.minMw1Speed}',
                           lowerYellow: 4000,
                           lowerRed: 3800,
                           upperYellow: 5000,
-                          upperRed: 5200),
-                      valueContainer(size, '${state.minMw1Speed}',
+                          upperRed: 5200,
+                        ),
+                      ),
+                      Tooltip(
+                        message: state.maxMw1Speed.toString(),
+                        child: valueContainer(
+                          size,
+                          '${state.maxMw1Speed}',
                           lowerYellow: 4000,
                           lowerRed: 3800,
                           upperYellow: 5000,
-                          upperRed: 5200),
-                      valueContainer(size, '${state.maxMw1Speed}',
-                          lowerYellow: 4000,
-                          lowerRed: 3800,
-                          upperYellow: 5000,
-                          upperRed: 5200),
+                          upperRed: 5200,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 5),
@@ -395,21 +466,30 @@ class _TelemetryDisplayState extends State<TelemetryDisplay> {
                           ),
                         ),
                       ),
-                      valueContainer(size, '${state.mw2Speed}',
-                          lowerYellow: 4000,
-                          lowerRed: 3800,
-                          upperYellow: 5000,
-                          upperRed: 5200),
-                      valueContainer(size, '${state.minMw2Speed}',
-                          lowerYellow: 4000,
-                          lowerRed: 3800,
-                          upperYellow: 5000,
-                          upperRed: 5200),
-                      valueContainer(size, '${state.maxMw2Speed}',
-                          lowerYellow: 4000,
-                          lowerRed: 3800,
-                          upperYellow: 5000,
-                          upperRed: 5200),
+                      valueContainer(
+                        size,
+                        '${state.mw2Speed}',
+                        lowerYellow: 4000,
+                        lowerRed: 3800,
+                        upperYellow: 5000,
+                        upperRed: 5200,
+                      ),
+                      valueContainer(
+                        size,
+                        '${state.minMw2Speed}',
+                        lowerYellow: 4000,
+                        lowerRed: 3800,
+                        upperYellow: 5000,
+                        upperRed: 5200,
+                      ),
+                      valueContainer(
+                        size,
+                        '${state.maxMw2Speed}',
+                        lowerYellow: 4000,
+                        lowerRed: 3800,
+                        upperYellow: 5000,
+                        upperRed: 5200,
+                      ),
                     ],
                   ),
                 ],
@@ -453,7 +533,7 @@ Widget valueContainer(Size size, String value,
 
   return Container(
     width: size.width * .12,
-    height: size.height * .05,
+    height: size.height * .04,
     decoration: BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(10),
@@ -461,7 +541,7 @@ Widget valueContainer(Size size, String value,
     child: Center(
       child: Text(
         displayValue,
-        style: TextStyle(fontSize: size.height * .03),
+        style: TextStyle(fontSize: size.height * .025),
       ),
     ),
   );

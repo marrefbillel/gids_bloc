@@ -20,14 +20,13 @@ class WMRow extends StatelessWidget {
             border: Border.all(width: 1.0, color: Colors.grey),
             borderRadius: BorderRadius.circular(10),
           ),
-          width: size.width * 0.05,
+          width: size.width * 0.04,
           height: size.width * 0.05,
           child: Center(
             child: Text(
               station!,
               style: TextStyle(
-                fontSize: size.width * 0.02,
-                fontWeight: FontWeight.bold,
+                fontSize: size.width * 0.015,
               ),
             ),
           ),
@@ -39,18 +38,18 @@ class WMRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             color: color,
           ),
-          width: size.width * 0.1,
-          height: size.width * 0.05,
+          width: size.width * .12,
+          height: size.height * .05,
           child: Center(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   mode!,
-                  style: const TextStyle(
-                    fontSize: 30,
+                  style: TextStyle(
+                    fontSize: size.height * .03,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xffffffff),
+                    color: const Color(0xffffffff),
                   ),
                 ),
                 const SizedBox(width: 10),

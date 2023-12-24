@@ -1,9 +1,9 @@
-import 'dart:typed_data';
-
 abstract class PitchRollEvent {}
 
 class PRFrameReceived extends PitchRollEvent {
-  final Uint8List frameData;
+  final List<double> pitchAndRoll;
 
-  PRFrameReceived(this.frameData);
+  PRFrameReceived(this.pitchAndRoll);
 }
+
+class PRReset extends PitchRollEvent {}

@@ -1,9 +1,9 @@
-import 'dart:typed_data';
-
 abstract class Mw1Mw2Event {}
 
 class MWFrameReceived extends Mw1Mw2Event {
-  final Uint8List frameData;
+  final List<double> mw1AndMw2;
 
-  MWFrameReceived(this.frameData);
+  MWFrameReceived(this.mw1AndMw2);
 }
+
+class MWReset extends Mw1Mw2Event {}

@@ -1,9 +1,9 @@
-import 'dart:typed_data';
-
-sealed class SystemModeEvent {}
+abstract class SystemModeEvent {}
 
 class SMFrameReceived extends SystemModeEvent {
-  final Uint8List frameData;
+  final List<int> systemMode;
 
-  SMFrameReceived(this.frameData);
+  SMFrameReceived(this.systemMode);
 }
+
+class SMReset extends SystemModeEvent {}

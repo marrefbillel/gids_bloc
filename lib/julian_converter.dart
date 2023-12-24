@@ -7,7 +7,7 @@ class JulianConveter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Text(j2000ToDateTime(2334296947.712)),
+      body: Text(j2000ToDateTime(2334469697.536)),
     );
   }
 }
@@ -23,7 +23,7 @@ String j2000ToDateTime(double j2000) {
 
 DateTime julianToDateTime(double julianDate) {
   // The Julian date for the Unix epoch (1970-01-01 00:00:00 UTC) is 2440587.5
-  double unixEpochJulianDate = 18294;
+  double unixEpochJulianDate = -14119388.452;
 
   // Calculate the number of seconds since the Unix epoch
   double secondsSinceEpoch = (julianDate - unixEpochJulianDate) * 24 * 60 * 60;

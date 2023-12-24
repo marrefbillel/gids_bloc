@@ -71,14 +71,14 @@ class _WorkingModeStreamState extends State<WorkingModeStream> {
                   mode: 'TM+TC',
                   station: widget.station!,
                   iconName: FluentIcons.double_chevron_up8,
-                  color: const Color(0xFFB01B2E),
+                  color: const Color(0xFFDC143C),
                 );
               case 'TM + RG':
                 return WMRow(
                   mode: 'TM+RG',
                   station: widget.station!,
                   iconName: FluentIcons.communications,
-                  color: const Color(0xFFFFD500),
+                  color: const Color(0xFFFFC300),
                 );
               default:
                 return const Text('Waiting for data...');
